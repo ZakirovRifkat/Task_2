@@ -16,6 +16,13 @@ void show(vector<vector<double>>matrix)
 	}
 	cout << endl;
 }
+double normVector(vector<double> vector)
+{
+	double norm = 0;
+	for (int i = 0; i < vector.size(); i++)
+		norm += fabs(vector[i]);
+	return norm;
+}
 vector<double> multiplyMatrixVector(vector<vector<double>>A, vector<double>b)
 {
 	int n = A.size();
@@ -122,10 +129,16 @@ vector<vector<double>> matrix_HD(vector<vector<double>>matrix, vector<vector<dou
 	vector<vector<double>>multiply(n, vector<double>(n)), 
 		H_D(n, vector<double > (n));
 	multiply = multiplyMatrixMatrix(reverse, matrix);
-	show(multiply);
+	//show(multiply);
 	for (int i = 0; i < n; i++)
 		for (int j = 0; j < n; j++)
-			H_D[i][j] = 1 - multiply[i][j];
+		{
+			if (i == j)
+				H_D[i][j] = 1 - multiply[i][j];
+			else
+				H_D[i][j] = 0 - multiply[i][j];
+		}
+
 	return H_D;
 }
 double normMatrix(vector<vector<double>>matrix)
@@ -144,39 +157,65 @@ double normMatrix(vector<vector<double>>matrix)
 	double max = *max_element(sums.begin(), sums.end());
 	return max;
 }
-int priori_estimate(double norm_H,vector<double>&g )
+int priori_estimate(double norm_H, vector<double>g)
 {
-	int n = g.size(),k=0;
-	double norm_g = 0,sum=0, estimate = 1;
-	for (int i = 0; i < n; i++)
-		sum += g[i] * g[i];
-	norm_g = sqrt(sum);
+	int n = g.size();
+	int k = 0;
+	double sum = 0, estimate = 1;
+	double norm_g = normVector(g);
+	//estimate = ((pow(norm_H, p) / (1 - norm_H)) * norm_g);
 	while (estimate > 0.001)
 	{
-		estimate = ((pow(norm_H, k) / (1 - norm_H))* norm_g);
+		estimate = ((pow(norm_H, k) / (1 - norm_H)) * norm_g);
 		k++;
 	}
+	//return estimate;
 	return k;
 }
+vector<double> simple_itteration(vector<vector<double>> alpha, vector<double>beta, vector<double>exSol)
+{
+	int n = beta.size(),step = 0;
+	double e = 0.001, factEstimate=1;
+	vector<double> x_k(n), x_0(n),estimate(n),Ax(n);
+	for (int i = 0; i < n; i++)
+		x_0[i] = beta[i];
+	while (factEstimate > e)
+	{
+		Ax = multiplyMatrixVector(alpha, x_0);
+		for (int i = 0; i < n; i++)
+		{
+			x_k[i] = Ax[i] + beta[i];
+			estimate[i] = x_k[i] - exSol[i];
+			x_0[i] = x_k[i];
+		}
+		factEstimate = normVector(estimate);
+		step++;
+	}
+	x_k.push_back(step);
+	return x_k;
+}
+
 /*--------------------------------------------------------------------------------------------------------------------------------------------------------*/
 
 int main()
 {
 	setlocale(LC_ALL, "Russian");
 	int n;
-	double e = 0.001, norm_HD=0;
+	double e = 0.001, norm_HD = 0;
 	cout << "Задание 2. Итерационные методы решения линейных систем. Вариант 3.\n"
 		<< "\nВведите размерность исходной матрицы:\n"
 		<< "n = ";
 	cin >> n;
-	vector<vector<double>> matrix_A(n, vector<double>(n)), 
-		D(n,vector<double>(n)),
-		reverse_D(n,vector<double>(n)),
-		H_D(n,vector<double>(n));
+	vector<vector<double>> matrix_A(n, vector<double>(n)),
+		D(n, vector<double>(n)),
+		reverse_D(n, vector<double>(n)),
+		H_D(n, vector<double>(n));
 
-	vector<double>vector_b(n), 
-		exSolution(n),
-		g_D(n); //exact solution
+	vector<double>vector_b(n),
+		exSolution(n),//exact solution
+		g_D(n),
+		solve_simple_itteration(n+1),
+		estimate(n);
 
 	cout << "\nЗаполняем матрицу (А):\n";
 	for (int i = 0; i < n; i++)
@@ -210,7 +249,7 @@ int main()
 	for (int i = 0; i < n; i++)
 		cout << "x[" << i + 1 << "] = " << exSolution[i] << "\n";
 
-	cout << "Матрица D:\n";
+	cout << "\nМатрица D:\n";
 	D = matrix_D(matrix_A);
 	show(D);
 
@@ -223,13 +262,24 @@ int main()
 	cout << "Вектор g_D:\n";
 	for (int i = 0; i < n; i++)
 		cout << "\t" << g_D[i];
-	cout << "\nМатрица H_D:\n";
+	cout << "\n\nМатрица H_D:\n";
 	show(H_D);
 	norm_HD = normMatrix(H_D);
 	cout << "||H_D|| = " << norm_HD << "\n";
-	cout << "Априорная оценка k = " << priori_estimate(norm_HD, g_D);
+	cout << "Априорная оценка при k = " << priori_estimate(norm_HD, g_D)<<endl;
+	//проверка на сходимость
+	if (norm_HD > 1)
+	{
+		cout << "\nУсловие на сходимость не выполняется.\n";
+		return(0);
+	} 
 
-		
-	
+	solve_simple_itteration = simple_itteration(H_D, g_D, exSolution);
+	cout << "\nРешение методом простой иттерации:\n";
+	for (int i = 0; i < n; i++)
+	{
+		cout <<"x["<<i+1<<"] = " << solve_simple_itteration[i] << endl;
+	}
+	cout << "Фактическое число иттераций k = " << solve_simple_itteration[n]<<endl;
 	return(0);
 }
