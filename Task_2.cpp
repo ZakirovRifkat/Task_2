@@ -23,6 +23,22 @@ double normVector(vector<double> vector)
 		norm += fabs(vector[i]);
 	return norm;
 }
+double normMatrix(vector<vector<double>>matrix)
+{
+	int n = matrix.size();
+	vector<double>sums(n);
+	for (int j = 0; j < n; j++)
+	{
+		double sum = 0;
+		for (int i = 0; i < n; i++)
+		{
+			sum += fabs(matrix[i][j]);
+		}
+		sums[j] = sum;
+	}
+	double max = *max_element(sums.begin(), sums.end());
+	return max;
+}
 vector<double> multiplyMatrixVector(vector<vector<double>>A, vector<double>b)
 {
 	int n = A.size();
@@ -141,23 +157,7 @@ vector<vector<double>> matrix_HD(vector<vector<double>>matrix, vector<vector<dou
 
 	return H_D;
 }
-double normMatrix(vector<vector<double>>matrix)
-{
-	int n = matrix.size();
-	vector<double>sums(n);
-	for (int j = 0; j < n; j++)
-	{
-		double sum = 0;
-		for (int i = 0; i < n; i++)
-		{
-			sum += fabs(matrix[i][j]);
-		}
-		sums[j] = sum;
-	}
-	double max = *max_element(sums.begin(), sums.end());
-	return max;
-}
-int priori_estimate(double norm_H, vector<double>g)
+int priori_estimate_step(double norm_H, vector<double>g)
 {
 	int n = g.size();
 	int k = 0;
@@ -172,11 +172,12 @@ int priori_estimate(double norm_H, vector<double>g)
 	//return estimate;
 	return k;
 }
-vector<double> simple_itteration(vector<vector<double>> alpha, vector<double>beta, vector<double>exSol)
+vector<vector<double>> simple_itteration(vector<vector<double>> alpha, vector<double>beta, vector<double>exSol)
 {
 	int n = beta.size(),step = 0;
 	double e = 0.001, factEstimate=1;
 	vector<double> x_k(n), x_0(n),estimate(n),Ax(n);
+	vector<vector<double>> matrix(3, vector<double>(n));
 	for (int i = 0; i < n; i++)
 		x_0[i] = beta[i];
 	while (factEstimate > e)
@@ -186,15 +187,63 @@ vector<double> simple_itteration(vector<vector<double>> alpha, vector<double>bet
 		{
 			x_k[i] = Ax[i] + beta[i];
 			estimate[i] = x_k[i] - exSol[i];
+			for (int m = 0; m < n; m++)
+			{
+				matrix[0][m] = x_k[m];
+				matrix[1][m] = x_0[m];
+			}
 			x_0[i] = x_k[i];
 		}
 		factEstimate = normVector(estimate);
 		step++;
 	}
-	x_k.push_back(step);
-	return x_k;
+	matrix[2][0] = step;
+	return matrix;
 }
-
+double apriori_estimate(vector<vector<double>> H, vector<double> g, int k)
+{
+	double normM = normMatrix(H), normV = normVector(g);
+	return normM * normV + (pow(normM, k) / (1 - normM)) * normV;
+}
+double aposteriori_estimate(vector<vector<double>> H, vector<vector<double>> x)
+{
+	double normM = normMatrix(H);
+	vector<double> delta(H.size());
+	for (int i = 0; i < H.size(); i++)
+		delta[i] = x[0][i] - x[1][i];
+	double normD = normVector(delta);
+	return (normM/(1-normM))*normD;
+}
+double scalar(vector<double> a, vector<double> b)
+{
+	double ab = 0;
+	for (int i = 0; i < a.size(); i++)
+		ab += a[i] * b[i];
+	return ab;
+}
+double spectr_radius(vector<vector<double>> matrix)
+{
+	int n = matrix.size();
+	double lambda = 0;
+	vector<double> x_0(n), x_k(n);
+	for (int i = 0; i < n; i++)
+		x_0[i] = 1;
+	for (int k = 0; k < 50; k++)
+	{
+		x_k = multiplyMatrixVector(matrix, x_0);
+		lambda = scalar(x_k, x_0) / scalar(x_0, x_0);
+		x_0 = x_k;
+	}
+	return fabs(lambda);
+}
+vector<double> Lusterink(vector<vector<double>> H, vector<vector<double>> solve)
+{
+	int n = H.size();
+	vector<double> x_lust(n);
+	for (int i = 0; i < n; i++)
+		x_lust[i] = solve[1][i] + (1 / (1 - spectr_radius(H))) * (solve[0][i] - solve[1][i]);
+	return x_lust;
+}
 /*--------------------------------------------------------------------------------------------------------------------------------------------------------*/
 
 int main()
@@ -209,13 +258,14 @@ int main()
 	vector<vector<double>> matrix_A(n, vector<double>(n)),
 		D(n, vector<double>(n)),
 		reverse_D(n, vector<double>(n)),
-		H_D(n, vector<double>(n));
+		H_D(n, vector<double>(n)), solve_simple_itteration(3, vector<double> (n));
 
 	vector<double>vector_b(n),
 		exSolution(n),//exact solution
 		g_D(n),
-		solve_simple_itteration(n+1),
-		estimate(n);
+		estimate(n),
+		x_lust(n),
+		delta(n);
 
 	cout << "\nЗаполняем матрицу (А):\n";
 	for (int i = 0; i < n; i++)
@@ -243,12 +293,12 @@ int main()
 			cout << "\t" << matrix_A[i][j];
 		cout << "\t" << vector_b[i] << endl;
 	}
-
+	//(1)
 	exSolution = Gauss(matrix_A, vector_b);
 	cout << "\nРешение методом Гаусса:\n";
 	for (int i = 0; i < n; i++)
 		cout << "x[" << i + 1 << "] = " << exSolution[i] << "\n";
-
+	//(2)
 	cout << "\nМатрица D:\n";
 	D = matrix_D(matrix_A);
 	show(D);
@@ -266,20 +316,32 @@ int main()
 	show(H_D);
 	norm_HD = normMatrix(H_D);
 	cout << "||H_D|| = " << norm_HD << "\n";
-	cout << "Априорная оценка при k = " << priori_estimate(norm_HD, g_D)<<endl;
+	//(3)
+	cout << "Априорная оценка при k = " << priori_estimate_step(norm_HD, g_D)<<"\n";
+
 	//проверка на сходимость
 	if (norm_HD > 1)
 	{
 		cout << "\nУсловие на сходимость не выполняется.\n";
 		return(0);
 	} 
-
+	//(4)
 	solve_simple_itteration = simple_itteration(H_D, g_D, exSolution);
 	cout << "\nРешение методом простой иттерации:\n";
 	for (int i = 0; i < n; i++)
-	{
-		cout <<"x["<<i+1<<"] = " << solve_simple_itteration[i] << endl;
-	}
-	cout << "Фактическое число иттераций k = " << solve_simple_itteration[n]<<endl;
+		cout <<"x["<<i+1<<"] = " << solve_simple_itteration[0][i] << "\n";
+	int step = solve_simple_itteration[2][0];
+	cout << "Фактическое число иттераций k = " << step << "\n";
+	cout << "Априорная оценка = " << apriori_estimate(H_D, g_D, step)<<"\n";
+	cout << "Апостериорная оценка = " << aposteriori_estimate(H_D, solve_simple_itteration)<<"\n";
+	x_lust = Lusterink(H_D, solve_simple_itteration);
+	cout << "Последнее приближение по Люстеринку:\n";
+	for (int i = 0; i < n; i++)
+		cout << "x[" << i + 1 << "] = " << x_lust[i] << "\n";
+	for (int i = 0; i < n; i++)
+		delta[i] = x_lust[i] - exSolution[i];
+	cout << "Фактическая погрешность приближения по Люстеринку = " << normVector(delta);
+	//(5)
+	
 	return(0);
 }
