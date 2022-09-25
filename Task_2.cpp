@@ -5,6 +5,7 @@
 
 using namespace std;
 
+
 void show(vector<vector<double>>matrix)
 {
 	int n = matrix.size();
@@ -154,7 +155,6 @@ vector<vector<double>> matrix_HD(vector<vector<double>>matrix, vector<vector<dou
 			else
 				H_D[i][j] = 0 - multiply[i][j];
 		}
-
 	return H_D;
 }
 int priori_estimate_step(double norm_H, vector<double>g)
@@ -244,13 +244,87 @@ vector<double> Lusterink(vector<vector<double>> H, vector<vector<double>> solve)
 		x_lust[i] = solve[1][i] + (1 / (1 - spectr_radius(H))) * (solve[0][i] - solve[1][i]);
 	return x_lust;
 }
+vector<double> Zeydel(vector<vector<double>>a, vector<double> b, vector<double> exSol)
+{
+	int n = b.size(),step=0;
+	vector<double> x(n);
+	for (int i = 0; i < n; i++)
+		x[i] = b[i];
+	double R=1,S,W=0,d=0,E=0.001;
+	while (R > E)
+	{
+		R = 0;
+		for (int i = 0; i < n; i++)
+		{
+			S = 0;
+			for (int j = 0; j < n; j++)
+				if (i != j)
+					S = S + a[i][j] * x[j];
+			W = (b[i] - S) / a[i][i];
+			d = fabs(W - x[i]);
+			if (R < d)
+				R = d;
+			x[i] = W;
+		}
+		step++;
+	}
+	x.push_back(step);
+	return x;
+}
+vector<double> relax(vector<vector<double>> &A, vector<double> &b, vector<double> &exSol)
+{
+	int n = b.size(), step = 0;
+	double R = 1, e = 0.001, sum = 0, sum1 = 0, sum2 = 0;
+	vector<double> x_0(n), x_k(n),delta(n), g(n);
+	vector<vector<double>> H(n, vector<double>(n));
+	for (int i = 0; i < n; i++)
+	{
+		for (int j = 0; j < n; j++)
+		{
+			if (i != j)
+				H[i][j] = -1 * (A[i][j] / A[i][i]);
+			else
+				H[i][j] = 0;
+		}
+		g[i] = b[i] / A[i][i];
+	}
+	double q = 2 / (1 + sqrt(1 - pow(spectr_radius(H), 2)));
+	for (int i = 0; i < n; i++)
+	{
+		x_0[i] = 1;
+		x_k[i] = 0;
+	}
+	while (R > e)
+	{
+		for (int i = 0; i < n; i++)
+		{
+			for (int j = 0; j <= i - 1; j++)
+			{
+				sum1 += H[i][j] * x_k[j];
+			}
+			for (int j = i + 1; j < n; j++)
+			{
+				sum2 += H[i][j] * x_0[j];
+			}
+			sum = sum1 + sum2 - x_0[i] + g[i];
+			x_k[i] = x_0[i] + q * sum;
+		}
+		for (int i = 0; i < n; i++)
+			delta[i] = x_k[i] - exSol[i];
+		R = normVector(delta);
+		x_0 = x_k;
+		step++;
+	}
+	x_k.push_back(step);
+	return x_k;
+}
 /*--------------------------------------------------------------------------------------------------------------------------------------------------------*/
 
 int main()
 {
 	setlocale(LC_ALL, "Russian");
 	int n;
-	double e = 0.001, norm_HD = 0;
+	double norm_HD = 0;
 	cout << "Задание 2. Итерационные методы решения линейных систем. Вариант 3.\n"
 		<< "\nВведите размерность исходной матрицы:\n"
 		<< "n = ";
@@ -265,6 +339,8 @@ int main()
 		g_D(n),
 		estimate(n),
 		x_lust(n),
+		x_zeydel(n+1),
+		x_relax(n+1),
 		delta(n);
 
 	cout << "\nЗаполняем матрицу (А):\n";
@@ -327,11 +403,11 @@ int main()
 	} 
 	//(4)
 	solve_simple_itteration = simple_itteration(H_D, g_D, exSolution);
-	cout << "\nРешение методом простой иттерации:\n";
+	cout << "\nРешение методом простой итерации:\n";
 	for (int i = 0; i < n; i++)
 		cout <<"x["<<i+1<<"] = " << solve_simple_itteration[0][i] << "\n";
 	int step = solve_simple_itteration[2][0];
-	cout << "Фактическое число иттераций k = " << step << "\n";
+	cout << "Фактическое число итераций k = " << step << "\n";
 	cout << "Априорная оценка = " << apriori_estimate(H_D, g_D, step)<<"\n";
 	cout << "Апостериорная оценка = " << aposteriori_estimate(H_D, solve_simple_itteration)<<"\n";
 	x_lust = Lusterink(H_D, solve_simple_itteration);
@@ -342,6 +418,22 @@ int main()
 		delta[i] = x_lust[i] - exSolution[i];
 	cout << "Фактическая погрешность приближения по Люстеринку = " << normVector(delta);
 	//(5)
+	x_zeydel = Zeydel(matrix_A, vector_b, exSolution);
+	cout << "\n\nРешение методом Зейделя:\n";
+	for (int i = 0; i < n; i++)
+		cout << "x[" << i + 1 << "] = " << x_zeydel[i] << "\n";
+	step = x_zeydel[n];
+	cout << "Фактическое число итераций k = " << step << "\n";
+	//(6)
+	cout << "\nСпектральный радиус матрицы перехода = " << spectr_radius(H_D)<<"\n";
+	//(7)
+	cout << "\nРешение методом верхней релаксации:\n";
+	x_relax = relax(matrix_A, vector_b, exSolution);
+	for (int i = 0; i < n; i++)
+		cout << "x[" << i + 1 << "] = " << x_relax[i] << "\n";
+	step = x_relax[n];
+	cout << "Фактическое число итераций k = " << step << "\n";
+
 	
 	return(0);
 }
