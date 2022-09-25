@@ -5,7 +5,6 @@
 
 using namespace std;
 
-
 void show(vector<vector<double>>matrix)
 {
 	int n = matrix.size();
@@ -32,9 +31,7 @@ double normMatrix(vector<vector<double>>matrix)
 	{
 		double sum = 0;
 		for (int i = 0; i < n; i++)
-		{
 			sum += fabs(matrix[i][j]);
-		}
 		sums[j] = sum;
 	}
 	double max = *max_element(sums.begin(), sums.end());
@@ -71,12 +68,8 @@ vector<double> Gauss(vector<vector<double>> matrix_A, vector<double> vector_b)
 	{
 		p = k;
 		for (int m = k + 1; m < n; m++)
-		{
 			if (abs(a[p][k]) < abs(a[m][k])) //поиск максимального ведущего элемента
-			{
 				p = m;
-			}
-		}
 		for (int j = k; j < n; j++)
 		{
 			r = a[k][j];
@@ -91,9 +84,7 @@ vector<double> Gauss(vector<vector<double>> matrix_A, vector<double> vector_b)
 			c = a[m][k] / a[k][k];
 			b[m] = b[m] - c * b[k]; //приведение матрицы к верхнетреугольному виду
 			for (int i = k; i < n; i++)
-			{
 				a[m][i] = a[m][i] - c * a[k][i];
-			}
 		}
 	}
 	x[n - 1] = b[n - 1] / a[n - 1][n - 1];
@@ -101,9 +92,7 @@ vector<double> Gauss(vector<vector<double>> matrix_A, vector<double> vector_b)
 	{
 		s = 0;
 		for (int i = k + 1; i < n; i++)				//обратный ход метода Гаусса
-		{
 			s = s + a[k][i] * x[i];
-		}
 		x[k] = (b[k] - s) / a[k][k];
 	}
 	return x;
@@ -113,7 +102,6 @@ vector<vector<double>> matrix_D(vector<vector<double>>matrix_A)
 	int n = matrix_A.size();
 	vector<vector<double >> D(n,vector<double>(n));
 	for(int i=0; i<n; i++)
-	{
 		for (int j = 0; j < n; j++)
 		{
 			if (i == j)
@@ -121,7 +109,6 @@ vector<vector<double>> matrix_D(vector<vector<double>>matrix_A)
 			else
 				D[i][j] = 0;
 		}
-	}
 	return D;
 }
 vector<vector<double>> reverse_matrix(vector<vector<double>> matrix)
@@ -244,73 +231,30 @@ vector<double> Lusterink(vector<vector<double>> H, vector<vector<double>> solve)
 		x_lust[i] = solve[1][i] + (1 / (1 - spectr_radius(H))) * (solve[0][i] - solve[1][i]);
 	return x_lust;
 }
-vector<double> Zeydel(vector<vector<double>>a, vector<double> b, vector<double> exSol)
+vector<double> Zeydel(vector<vector<double>>H, vector<double> g, vector<double> exSol)
 {
-	int n = b.size(),step=0;
-	vector<double> x(n);
-	for (int i = 0; i < n; i++)
-		x[i] = b[i];
-	double R=1,S,W=0,d=0,E=0.001;
-	while (R > E)
-	{
-		R = 0;
-		for (int i = 0; i < n; i++)
-		{
-			S = 0;
-			for (int j = 0; j < n; j++)
-				if (i != j)
-					S = S + a[i][j] * x[j];
-			W = (b[i] - S) / a[i][i];
-			d = fabs(W - x[i]);
-			if (R < d)
-				R = d;
-			x[i] = W;
-		}
-		step++;
-	}
-	x.push_back(step);
-	return x;
-}
-vector<double> relax(vector<vector<double>> &A, vector<double> &b, vector<double> &exSol)
-{
-	int n = b.size(), step = 0;
-	double R = 1, e = 0.001, sum = 0, sum1 = 0, sum2 = 0;
-	vector<double> x_0(n), x_k(n),delta(n), g(n);
-	vector<vector<double>> H(n, vector<double>(n));
+	int n = g.size(), step = 0;
+	double e = 0.001, R = 1, sum1=0, sum2=0;
+	vector<double>x_k(n), x_0(n),delta(n);
 	for (int i = 0; i < n; i++)
 	{
-		for (int j = 0; j < n; j++)
-		{
-			if (i != j)
-				H[i][j] = -1 * (A[i][j] / A[i][i]);
-			else
-				H[i][j] = 0;
-		}
-		g[i] = b[i] / A[i][i];
-	}
-	double q = 2 / (1 + sqrt(1 - pow(spectr_radius(H), 2)));
-	for (int i = 0; i < n; i++)
-	{
-		x_0[i] = 1;
+		x_0[i] = g[i];
 		x_k[i] = 0;
 	}
+
 	while (R > e)
 	{
-		for (int i = 0; i < n; i++)
+		for (int i = 0; i < n;i++)
 		{
+			sum1 = 0; sum2 = 0;
 			for (int j = 0; j <= i - 1; j++)
-			{
 				sum1 += H[i][j] * x_k[j];
-			}
-			for (int j = i + 1; j < n; j++)
-			{
+			for (int j = i; j < n; j++)
 				sum2 += H[i][j] * x_0[j];
-			}
-			sum = sum1 + sum2 - x_0[i] + g[i];
-			x_k[i] = x_0[i] + q * sum;
+			x_k[i] = sum1 + sum2 + g[i];
 		}
 		for (int i = 0; i < n; i++)
-			delta[i] = x_k[i] - exSol[i];
+			delta[i] = fabs(x_k[i] - exSol[i]);
 		R = normVector(delta);
 		x_0 = x_k;
 		step++;
@@ -318,6 +262,39 @@ vector<double> relax(vector<vector<double>> &A, vector<double> &b, vector<double
 	x_k.push_back(step);
 	return x_k;
 }
+vector<double> relax(vector<vector<double>> H, vector<double> g, vector<double> exSol)
+{
+	int n = g.size(), step = 0;
+	double R = 1, e = 0.001, sum = 0, sum1, sum2;
+	vector<double> x_0(n), x_k(n+1),delta(n);
+	double q = 2 / (1 + sqrt(1 - pow(spectr_radius(H), 2)));
+	for (int i = 0; i < n; i++)
+	{
+		x_0[i] = 1;
+		x_k[i] = 0;
+	}	
+	while (R >= e)
+	{
+		for (int i = 0; i < n; i++)
+		{
+			sum = 0; sum1 = 0; sum2 = 0;
+			for (int j = 0; j <= i - 1; j++)
+				sum1 += H[i][j] * x_k[j];
+			for (int j = i+1; j < n; j++)
+				sum2 += H[i][j] * x_0[j];
+			sum = sum1 + sum2 - x_0[i] + g[i];
+			x_k[i] = x_0[i] + q * sum;
+		}
+		x_0 = x_k;
+		for (int i = 0; i < n; i++)
+			delta[i] = (exSol[i] - x_k[i]);
+		R = normVector(delta);		
+		step++;
+	}
+	x_k[n] = step;
+	return x_k;
+}
+
 /*--------------------------------------------------------------------------------------------------------------------------------------------------------*/
 
 int main()
@@ -418,7 +395,7 @@ int main()
 		delta[i] = x_lust[i] - exSolution[i];
 	cout << "Фактическая погрешность приближения по Люстеринку = " << normVector(delta);
 	//(5)
-	x_zeydel = Zeydel(matrix_A, vector_b, exSolution);
+	x_zeydel = Zeydel(H_D, g_D, exSolution);
 	cout << "\n\nРешение методом Зейделя:\n";
 	for (int i = 0; i < n; i++)
 		cout << "x[" << i + 1 << "] = " << x_zeydel[i] << "\n";
@@ -428,12 +405,10 @@ int main()
 	cout << "\nСпектральный радиус матрицы перехода = " << spectr_radius(H_D)<<"\n";
 	//(7)
 	cout << "\nРешение методом верхней релаксации:\n";
-	x_relax = relax(matrix_A, vector_b, exSolution);
+	x_relax = relax(H_D, g_D, exSolution);
 	for (int i = 0; i < n; i++)
 		cout << "x[" << i + 1 << "] = " << x_relax[i] << "\n";
 	step = x_relax[n];
 	cout << "Фактическое число итераций k = " << step << "\n";
-
-	
 	return(0);
 }
